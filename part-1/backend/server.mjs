@@ -43,6 +43,7 @@ const server = createServer((req, res) => {
 
   const now = new Date();
   json(200, {
+    message: "Hello from liu88!",
     time: now.toISOString(),
     epoch_ms: now.getTime(),
     runtime: `nodejs-${process.version}`,

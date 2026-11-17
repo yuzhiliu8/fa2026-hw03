@@ -8,6 +8,7 @@ resource "aws_cloudwatch_log_group" "backend" {
 resource "aws_ecs_cluster" "this" {
   # TODO: name the cluster. (With Fargate a "cluster" is just a namespace --
   #       there are no servers to join it. You're naming a grouping.)
+  name = var.project_name
 }
 
 resource "aws_ecs_task_definition" "backend" {
@@ -36,6 +37,37 @@ resource "aws_ecs_task_definition" "backend" {
   #       ":v1" doesn't change when you rebuild ":v1": Terraform sees no diff,
   #       writes no new revision, and your new code never ships. The digest
   #       changes whenever the image's contents do, so the dependency is real.
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = "256"
+  memory                   = "512"
+  execution_role_arn       = data.aws_iam_role.task_execution.arn
+
+  container_definitions = jsonencode([{
+    name      = "backend"
+    image     = "${aws_ecr_repository.backend.repository_url}@${docker_registry_image.backend.sha256_digest}"
+    essential = true
+
+    portMappings = [{
+      containerPort = var.container_port
+      hostPort      = var.container_port
+      protocol      = "tcp"
+    }]
+
+    environment = [{
+      name  = "PLATFORM"
+      value = "ecs"
+    }]
+
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        "awslogs-group"         = aws_cloudwatch_log_group.backend.name
+        "awslogs-region"        = var.aws_region
+        "awslogs-stream-prefix" = "backend"
+      }
+    }
+  }])
 }
 
 resource "aws_ecs_service" "backend" {
@@ -58,4 +90,18 @@ resource "aws_ecs_service" "backend" {
   #       get wrong on a first apply: the service can't register targets
   #       before the listener exists, and nothing here references the listener.
   #       Terraform has a meta-argument for dependencies it can't infer.
+
+  network_configuration {
+    subnets          = local.subnet_ids
+    security_groups  = [aws_security_group.service.id]
+    assign_public_ip = true
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.this.arn
+    container_name   = "backend"
+    container_port   = var.container_port
+  }
+
+  depends_on = [aws_lb_listener.http]
 }

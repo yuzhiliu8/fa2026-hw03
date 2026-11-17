@@ -16,6 +16,9 @@ resource "aws_ecr_repository" "backend" {
   #     second push just fails.
   #
   # https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/ecr_repository
+  name                 = "${var.project_name}-backend"
+  force_delete         = true
+  image_tag_mutability = "MUTABLE"
 }
 
 resource "docker_image" "backend" {
@@ -24,6 +27,8 @@ resource "docker_image" "backend" {
   #       (`terraform validate` will name the missing argument for you.)
 
   # GIVEN: what to build. The backend source sits in part-1/backend.
+  name = "${aws_ecr_repository.backend.repository_url}:${var.image_tag}"
+
   build {
     context    = abspath("${path.module}/../backend")
     dockerfile = "Dockerfile"

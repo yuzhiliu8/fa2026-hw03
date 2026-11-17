@@ -11,6 +11,20 @@ resource "aws_security_group" "alb" {
 
   # TODO: let the public reach this load balancer over HTTP, and let the load
   #       balancer open outbound connections to your tasks.
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 }
 
 resource "aws_security_group" "service" {
@@ -31,4 +45,18 @@ resource "aws_security_group" "service" {
   #       egress rule, but managing the group as code *removes* it. Leave egress
   #       out and you get a task that can't fetch its own image, and a load
   #       balancer with no healthy targets and no obvious explanation.
+
+  ingress {
+    from_port       = var.container_port
+    to_port         = var.container_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 }
